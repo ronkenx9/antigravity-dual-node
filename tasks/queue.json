@@ -1,5 +1,16 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-29T20:37:26.361Z",
-  "tasks": []
+  "updatedAt": "2026-10-29T21:58:42.755Z",
+  "tasks": [
+    {
+      "id": "task_4c61ac5e",
+      "status": "pending",
+      "createdAt": "2026-10-29T21:58:42.754Z",
+      "submittedBy": "mac-commander",
+      "type": "gpu-benchmark",
+      "command": "python scripts/win/check-gpu.py --json",
+      "priority": "normal",
+      "payload": {}
+    }
+  ]
 }

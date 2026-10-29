@@ -100,12 +100,35 @@ def process_task(task):
         }
         return False, result
 
-def run_loop(poll_interval=3, single_run=False):
+def git_sync_pull():
+    try:
+        subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+def git_sync_push(task_id):
+    try:
+        subprocess.run(["git", "add", "tasks/"], cwd=REPO_ROOT, check=True)
+        subprocess.run(["git", "commit", "-m", f"chore(worker): complete task {task_id}"], cwd=REPO_ROOT, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=REPO_ROOT, check=True)
+    except Exception as e:
+        print(f"⚠️ Git push notice: {e}")
+
+def run_loop(poll_interval=3, single_run=False, auto_sync=False):
     print(f"🚀 HP OMEN Worker Daemon initialized.")
     print(f"📁 Watching: {QUEUE_PATH}")
-    print(f"⏱️  Poll interval: {poll_interval}s\n")
+    print(f"⏱️  Poll interval: {poll_interval}s")
+    if auto_sync:
+        print(f"🔄 Auto-sync with GitHub: ENABLED\n")
+    else:
+        print(f"🔄 Auto-sync with GitHub: DISABLED (local queue only)\n")
 
+    sync_counter = 0
     while True:
+        if auto_sync and (sync_counter % 5 == 0):
+            git_sync_pull()
+        sync_counter += 1
+
         queue = load_queue()
         if queue and "tasks" in queue:
             pending_tasks = [t for t in queue["tasks"] if t.get("status") == "pending"]
@@ -131,10 +154,15 @@ def run_loop(poll_interval=3, single_run=False):
 
                 print(f"🏁 Task {task['id']} finished with status: {task['status']}")
 
+                if auto_sync:
+                    print("📤 Syncing completed task result to GitHub...")
+                    git_sync_push(task["id"])
+
         if single_run:
             break
         time.sleep(poll_interval)
 
 if __name__ == "__main__":
     is_single = "--single" in sys.argv
-    run_loop(poll_interval=3, single_run=is_single)
+    is_sync = "--sync" in sys.argv
+    run_loop(poll_interval=3, single_run=is_single, auto_sync=is_sync)
