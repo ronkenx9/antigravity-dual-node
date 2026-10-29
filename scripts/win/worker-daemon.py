@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+HP OMEN Background Worker Daemon
+Monitors tasks/queue.json, executes compute & render workloads using GPU resources,
+and writes structured execution logs to tasks/results/<task_id>.json.
+"""
+
+import os
+import sys
+import time
+import json
+import subprocess
+from datetime import datetime, timezone
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+QUEUE_PATH = os.path.join(REPO_ROOT, "tasks", "queue.json")
+RESULTS_DIR = os.path.join(REPO_ROOT, "tasks", "results")
+
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+def load_queue():
+    if not os.path.exists(QUEUE_PATH):
+        return {"version": "1.0", "updatedAt": now_iso(), "tasks": []}
+    try:
+        with open(QUEUE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error reading queue.json: {e}")
+        return None
+
+def save_queue(data):
+    data["updatedAt"] = now_iso()
+    temp_path = QUEUE_PATH + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_path, QUEUE_PATH)
+
+def process_task(task):
+    task_id = task["id"]
+    command = task.get("command", "")
+    print(f"\n⚡ [{now_iso()}] Claimed Task {task_id} ({task.get('type')})")
+    print(f"   Command: {command}")
+
+    started_at = now_iso()
+    start_time = time.time()
+    
+    if not command:
+        result = {
+            "taskId": task_id,
+            "status": "failed",
+            "error": "No command specified in task definition.",
+            "startedAt": started_at,
+            "finishedAt": now_iso(),
+            "durationSec": 0
+        }
+        return False, result
+
+    try:
+        proc = subprocess.run(
+            command,
+            shell=True,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        duration = round(time.time() - start_time, 2)
+        success = (proc.returncode == 0)
+
+        result = {
+            "taskId": task_id,
+            "status": "completed" if success else "failed",
+            "returnCode": proc.returncode,
+            "stdout": proc.stdout[-4000:],  # last 4KB
+            "stderr": proc.stderr[-4000:],
+            "startedAt": started_at,
+            "finishedAt": now_iso(),
+            "durationSec": duration
+        }
+        return success, result
+    except Exception as e:
+        duration = round(time.time() - start_time, 2)
+        result = {
+            "taskId": task_id,
+            "status": "failed",
+            "error": str(e),
+            "startedAt": started_at,
+            "finishedAt": now_iso(),
+            "durationSec": duration
+        }
+        return False, result
+
+def run_loop(poll_interval=3, single_run=False):
+    print(f"🚀 HP OMEN Worker Daemon initialized.")
+    print(f"📁 Watching: {QUEUE_PATH}")
+    print(f"⏱️  Poll interval: {poll_interval}s\n")
+
+    while True:
+        queue = load_queue()
+        if queue and "tasks" in queue:
+            pending_tasks = [t for t in queue["tasks"] if t.get("status") == "pending"]
+            if pending_tasks:
+                task = pending_tasks[0]
+                task["status"] = "in_progress"
+                task["worker"] = "hp-omen-gpu"
+                task["startedAt"] = now_iso()
+                save_queue(queue)
+
+                success, result = process_task(task)
+
+                # Save execution result artifact
+                res_path = os.path.join(RESULTS_DIR, f"{task['id']}.json")
+                with open(res_path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, indent=2)
+
+                # Update queue status
+                task["status"] = "completed" if success else "failed"
+                task["finishedAt"] = now_iso()
+                task["durationSec"] = result.get("durationSec")
+                save_queue(queue)
+
+                print(f"🏁 Task {task['id']} finished with status: {task['status']}")
+
+        if single_run:
+            break
+        time.sleep(poll_interval)
+
+if __name__ == "__main__":
+    is_single = "--single" in sys.argv
+    run_loop(poll_interval=3, single_run=is_single)

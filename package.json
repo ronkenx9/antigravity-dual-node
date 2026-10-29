@@ -1,0 +1,24 @@
+{
+  "name": "antigravity-dual-node",
+  "version": "1.0.0",
+  "description": "Concurrent dual-machine orchestration system connecting macOS frontend and Windows HP OMEN GPU compute node for Antigravity agents",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/verify-setup.mjs",
+    "dispatch:test": "node scripts/mac/dispatch-task.mjs --test",
+    "dispatch": "node scripts/mac/dispatch-task.mjs",
+    "sync": "bash scripts/mac/sync.sh"
+  },
+  "keywords": [
+    "antigravity",
+    "dual-machine",
+    "gpu-compute",
+    "remote-rendering",
+    "orchestration",
+    "moonlight",
+    "sunshine",
+    "cuda"
+  ],
+  "author": "ronkenx9",
+  "license": "MIT"
+}
