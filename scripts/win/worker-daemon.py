@@ -35,7 +35,7 @@ def load_queue():
         with open(QUEUE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"⚠️ Error reading queue.json: {e}")
+        print(f"⚠️ Error reading queue.json: {e}", flush=True)
         return None
 
 def save_queue(data):
@@ -48,8 +48,8 @@ def save_queue(data):
 def process_task(task):
     task_id = task["id"]
     command = task.get("command", "")
-    print(f"\n⚡ [{now_iso()}] Claimed Task {task_id} ({task.get('type')})")
-    print(f"   Command: {command}")
+    print(f"\n⚡ [{now_iso()}] Claimed Task {task_id} ({task.get('type')})", flush=True)
+    print(f"   Command: {command}", flush=True)
 
     started_at = now_iso()
     start_time = time.time()
@@ -72,17 +72,22 @@ def process_task(task):
             cwd=REPO_ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            encoding="utf-8",
+            errors="replace"
         )
         duration = round(time.time() - start_time, 2)
         success = (proc.returncode == 0)
+
+        stdout_text = (proc.stdout or "")[-4000:]
+        stderr_text = (proc.stderr or "")[-4000:]
 
         result = {
             "taskId": task_id,
             "status": "completed" if success else "failed",
             "returnCode": proc.returncode,
-            "stdout": proc.stdout[-4000:],  # last 4KB
-            "stderr": proc.stderr[-4000:],
+            "stdout": stdout_text,
+            "stderr": stderr_text,
             "startedAt": started_at,
             "finishedAt": now_iso(),
             "durationSec": duration
@@ -101,9 +106,9 @@ def process_task(task):
         return False, result
 
 def run_loop(poll_interval=3, single_run=False):
-    print(f"🚀 HP OMEN Worker Daemon initialized.")
-    print(f"📁 Watching: {QUEUE_PATH}")
-    print(f"⏱️  Poll interval: {poll_interval}s\n")
+    print(f"🚀 HP OMEN Worker Daemon initialized.", flush=True)
+    print(f"📁 Watching: {QUEUE_PATH}", flush=True)
+    print(f"⏱️  Poll interval: {poll_interval}s\n", flush=True)
 
     while True:
         queue = load_queue()
@@ -129,7 +134,7 @@ def run_loop(poll_interval=3, single_run=False):
                 task["durationSec"] = result.get("durationSec")
                 save_queue(queue)
 
-                print(f"🏁 Task {task['id']} finished with status: {task['status']}")
+                print(f"🏁 Task {task['id']} finished with status: {task['status']}", flush=True)
 
         if single_run:
             break
