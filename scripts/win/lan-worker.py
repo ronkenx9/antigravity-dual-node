@@ -80,6 +80,8 @@ def execute_task(task):
         }
 
     try:
+        worker_env = os.environ.copy()
+        worker_env["PYTHONIOENCODING"] = "utf-8"
         proc = subprocess.run(
             command,
             shell=True,
@@ -87,7 +89,8 @@ def execute_task(task):
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            env=worker_env
         )
         duration = round(time.time() - start_time, 2)
         success = (proc.returncode == 0)
