@@ -12,6 +12,13 @@ import json
 import subprocess
 from datetime import datetime, timezone
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 QUEUE_PATH = os.path.join(REPO_ROOT, "tasks", "queue.json")
 RESULTS_DIR = os.path.join(REPO_ROOT, "tasks", "results")

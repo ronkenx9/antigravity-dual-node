@@ -9,6 +9,13 @@ import json
 import subprocess
 import shutil
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 def get_nvidia_smi():
     smi = shutil.which("nvidia-smi")
     if not smi:
